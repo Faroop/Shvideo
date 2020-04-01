@@ -60,4 +60,95 @@ import shutil
 print (str(cx_Freeze))
 
 #set '${ARCHLIB}' envvar to override system library path
-ARCHLIB =
+ARCHLIB = os.getenv('ARCHLIB' , "/usr/lib/x86_64-linux-gnu/")
+if not ARCHLIB.endswith('/')
+   ARCHLIB += '/' 
+ 
+# Packages to include 
+python_packages = ["os", 
+                   "sys",
+                   "PyQt5",
+                   "openshot",
+                   "time",
+                   "uuid", 
+                   "shutil",
+                   "threading",
+                   "subprocess",
+                   "re",
+                   "math",
+                   "xml",
+                   "logging",
+                   "urllib",
+                   "requests",
+                   "zmq",
+                   "webbrowser".
+                   "json"
+                  ]
+# Determine absolute PATH of Shvideo folder 
+PATH = os.path.dirname(os.path.realpath(__file__))  # Primary Shvideo folder 
+
+#Make a copy of the src tree (temporary for naming reasons only) 
+if os.path.exists(os.path.join(PATH, "src")):
+   print("Copying modules to Shvideo_qt directory: %s" % os.path.join(PATH, "Shvideo_qt"))
+   #only make a copy if the SRC directory is present (otherwise ignore this) 
+   copytree.(os.path.join(PATH, "src"), os.path.join(PATH, "Shvideo_qt"))
+   
+   # Make a copy of the launch.py script (To name it more appropriately) 
+   copy(os.path.join(PATH, "src", "launch.py"), os.path.join(PATH, "Shvideo_qt", "launch_Shvideo"))
+   
+if os.path.exists(os.path.join(PATH, "Shvideo_qt")): 
+   # Append path to system path 
+   sys.path.append(os.path.join(PATH, "Shvideo_qt"))
+   print("Loaded modules from Shvideo_qt directory: %s" % os.path.join(PATH, "Shvideo_qt"))
+   
+# Append possible build server paths
+sys.path.insert(0, os.path.join(PATH, "build", "install-x86", "lib"))
+sys.path.insert(0, os.path.join(PATH, "build", "install-x64", "lib"))
+
+from classes import info 
+from classes.logger import log 
+
+log.info("Execution path: %s" % os.path.abspath(__file__)
+
+# Find files matching patterns 
+def find files(directory, patterns):
+     """Recursively find all files in a folder tree""
+     for root, dirs, files in os.walk(directory):
+         for basename in files: 
+             if ".pyc" not in basename and "__pycache__" not in basename: 
+                 for pattern in patterns: 
+                     if fnmatch.fnmatch(basename, pattern): 
+                        filename = os.path.join(root,basename) 
+                        yeild filename 
+                        
+ # GUI applications require a different base on windows 
+ iconFile = "Shvideo_qt"
+ base = None 
+ src_file = []
+ external_so_files = []
+ build_options = {}
+ build_exe_options = {}
+ exe_name = info.NAME 
+ 
+ #Copy QT translattion to local folder (to be packaged) 
+ qt_local_path = os.path.join(PATH, "Shvideo", "language")
+ qt_system_path = QLibraryInfo.location(QLibraryInfo.TranslationPath)
+ if os.path.exists(qt_system_path):
+    # Create local QT translation folder (if needed) 
+    if not os.path.exists(qt_local_path): 
+        os.mkdir(qt_local_path)
+    # Loop through QT translation files and copy them
+    for file in os.listdir(qt_system_path):
+        #Copy QT translation files
+        if (file.startwith("qt") or file.startwith("qtbase")) and file.endswith(".qm"):
+           shutil.copyfile(os.path.join(qt_system_path, file), os.path.join(qt_local_path, file))
+ #copy git log files inton src file (if found) 
+ for project in ["libShvideo-audio", "libShvideo", "Shvideo-qt"]: 
+     git_log_path = os.path.join(PATH, "build", "install-x64", "share", "%s.log" % project)
+     if os.path.exists(git_log_path):
+         src_files.append((git_log_path, "settings/%s.log" % project))
+     else:
+         git_log_path = os.path.join(PATH, "build", "install-x86", "share", "%s.log" % project) 
+         if os.path.exists(git_log_path):
+            src_files.append((git_log_path, "settings/%s.log" % project))
+         
