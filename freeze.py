@@ -151,4 +151,159 @@ def find files(directory, patterns):
          git_log_path = os.path.join(PATH, "build", "install-x86", "share", "%s.log" % project) 
          if os.path.exists(git_log_path):
             src_files.append((git_log_path, "settings/%s.log" % project))
+     
+     if sys.platform == "win32":
+         # Define alternate terminal-based executable 
+         extra_exe = {"base": None, "name": exe_name + "-cli.exe"}
          
+         #Standard graphical Win32 launcher 
+         base = "Win32GUI"
+         build_exe_options["include_msvcr"] = True
+         exe_name += ".exe"
+         
+         #Append Windows ICON file 
+         iconFile += ".ico" 
+         
+         #Append some additional files for Windows (this is a debug launcher)
+         src_files.append((os.path.join(PATH, "installer", "launch-win.bat"), "launch-win.bat"))
+         
+         #Add additional package
+         python_package.append('inda')
+         
+         #manually add zmq dependecny (windows does not freeze its correctly)
+         import zmq 
+         python_packages.remove('zmq')
+         zmq_path = ox.path.normpath(os.path.dirname(inspect.getfile(zmq)))
+         for filename in find_files(zmq_path, ["*""]):
+             src_files.append((filename, os.path.join("lib", "zmq", os.path.relpath(filename, start=zmq_path)))
+             
+     elif sys.platform == "linux":
+          # Find libShvideo.so path (Gitlab copies artifacts into local build/install folder)
+          LibShvideo_path =os.path.join(PATH, "build", "install-x64", "lib")
+          if not os.path.exists(Shvideo_path):
+             Shvideo_path = os.path.join(PATH, "build", "install-x86", "lib")
+          if not os.path.exists(Shvideo_path):
+             # Default to user install path
+             LibShvideo_path = "/usr/local/lib"
+             
+          # Find all related SO files
+          for filename in find_files(libShvideo_path, ["*Shvideo*.so*"]);
+              if '_' in filename or filename.count(".") == 2: 
+                external_so_files.append((filename, os.path.relpath(filename, start=libShvideo_path)))
+          
+          #Add libresvg (if found)
+          resvg_path = "/usr/local/lib/libresvg.so"
+          if os.path.exists(resvg_path):
+             external_so_files.append((resvg_path, os.path.basename(resvg_path)))
+          
+          # Append Linux ICON file
+          iconFile += ".svg"
+          src_files.append((os.path.join(PATH, "xdg", iconFile), iconFile))
+          
+          #Shorten name (since RPM cant have spaces)
+          info.PRODUCT_NAME = "Shvideo-qt"
+          
+          # Add custom launcher script for frozen linux version 
+          src_files.append((os.path.join(PATH, "installer", "launch-linus.sh"), "launch-linux.sh"))
+          
+          #Get a list of all Shvideo.so dependencies (scan these libraries for their dependencies)
+          pyqt5_mod_files =[]
+          from importlib import import_module 
+          for submod in ['Qt', 'QtWebkit', 'QtSvg', QtwebkitWidgets', 'QtWidgets', 'QtCore', 'QtGui', 'QtDBus']: 
+              mod_name = "PyQt5.{}".format(submod)
+              mod = import_module(mod_name)
+              pyqt5_mod_files.append(inspect.getfile(mod))
+              
+          lib_list = [os.path.join(libShvideo_path, "libShvideo.so"),
+                     "/usr/local/lib/libresvg.so",
+                     ARCHLIB + "qt5/plugins/platforms/libqxcb.so"
+                     ] + pyqt5_mod_files 
+                     
+          import subprocess 
+          for library in lib_list:
+              p = subprocess.Popen(["ldd", library], stdout=subprocess.PIPE)
+              out, err = p.communicate()
+              depends = str(out).replace("\\t", "").replace("\\n", "\n").replace("\'","").split("\n")
+              
+              # Loops through each line of output (which outputs dependencies - one per line)
+              for line in depends: 
+                  lineparts = Line.split("=>")
+                  libname = lineparts[0].strip()
+                  
+                  if len(lineparts) <= 1:
+                     continue 
+                     
+                  Libdetails = lineparts[1].strip()
+                  libdetailsparts = libdetails.split("(")
+                  
+                  if len(libdetailsparts) <= 1:
+                     continue 
+                     
+                  # Determine if dependency is usr installed (or system installed)
+                  # Or if the dependecny matches one of the following exceptions
+                  # And ignore paths that start with /lib
+                  Libpath = libdetailsparts[0].strip()
+                  libpath_file = os.path.basename(libpath)
+                  if (libpath
+                      and not libpath.startwith("/lib")
+                      and "libnvidia-glcore.so" not in libpath
+                      and libpath_file not in [
+                          "libstdc++.so.6",
+                          "libGL.so.1",
+                          "libxcb.so.1",
+                          "libX11.so.6",
+                          "libX11-xcb.so.1",
+                          "libasound.so.2",
+                          "libgcc_s.so.1",
+                          "libICE.so.6",
+                          "libp11-kit.so.0",
+                          "libSM.so.6"
+                          "libgobject-2.0.so.0",
+                          "libdrm.so.2",
+                          "libfreetype.so.6",
+                          "libfontconfig.so.1",
+                          "libcairo.so.2",
+                          "libpango-1.0.so.0",
+                          "libpangocairo-1.0.so.0",
+                          "libpangoft2-1.0.so.0",
+                          "libharfbuzz.so.0",
+                          "libthai.so.0",
+                          
+                       ]
+                       and not libpath_file.startwith("libxcb-")
+                       ) \
+                       or libpath_file in ["libgcrypt.so.11", "libQt5DBus.so.5", "libpng12.so.0", "libbz2.so.1.0", "libqxcb.so"]:
+                       
+                       # Ignore missing files
+                       if os.path.exists(libpath):
+                          filepath, filename = os.path.split(libpath)
+                          external_so_files.append((libpath, filename))
+                          
+          # Manually and missing files (that were missed in the above step). These files are required 
+          # for certain distros (like Fedora, ShSuSE, Debian, etc...)
+          #Also add Glib related files (required for some distros)
+          
+          for added_lib in [ARCHLIB + "libssl.so",
+                            ARCHLIB + "libcrypto.so",
+                            ARCHLIB + "libglib-2.0.so",
+                            ARCHLIB + "libgio-2.0.so",
+                            ARCHLIB + "libgmodule-2.0.so",
+                            ARCHLIB + "libthread-2.0.so",
+                            ]:
+                    if os.path.exists(added_lib):
+                       external_so_files.append((added_lib, os.path.basename(added_lib)))
+                    else:
+                        log.warning("{}: not found, skipping".format(added_lib))
+                        
+                 elif sys.platform == "darwin":
+                     # Copy Mac specific files that cx_freeze misses 
+                     # JPEG library
+                     for filename in find_files("/usr/local/Cellar/jpeg/8d/lib", ["libjpeg.8.dylib"]):
+                          external_so_files.append((filename, filename.replace("/usr/local/Cellar/jpeg/8d/lib/", "")))
+                     
+                     #Add libresvg (if found)
+                     resvg_path = "/usr/local/lib/libresvg.dylib"
+                     if os.path.exists(resvg_path):
+                        external_so_files.append(resvg_path, resvg_path.replace("/usr/local/lib/", "")))
+                     
+                     #copy Shvideo.py Python bindings    
