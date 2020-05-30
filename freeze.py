@@ -306,4 +306,52 @@ def find files(directory, patterns):
                      if os.path.exists(resvg_path):
                         external_so_files.append(resvg_path, resvg_path.replace("/usr/local/lib/", "")))
                      
-                     #copy Shvideo.py Python bindings    
+                     #copy Shvideo.py Python bindings   
+                     src_files.append((os.path.join(PATH, "Shvideo.py"), "Shvideo.py"))
+                     src_files.append((os.path.join(PATH, "installer", "launch-mac.sh"), "launch-mac.sh"))
+                     
+                     # Append Mac ICON file
+                     iconFile += " .hqx"
+                     src_files.append((os.path.join(PATH, "xdg", iconFile), iconFile))
+                     
+                  # Append all Source files 
+                  src_files.append((os.path.join(PATH, "installer", "qt.conf"), "qt.conf"))
+                  for filename in find_files("Shvideo_qt", ["*"]):
+                      src_files.append((filename, filename.replace("Shvideo_qt/", "").replace(Shvideo_qt\\", "")))
+                      
+                  # Dependencies are automatically detected, but it might need fine tuning. 
+                  build_exe_option["packages"] = python_packages
+                  build_exe_options["include_files"] = src_files + external_so_files
+                  
+                  # Set options 
+                  build_options["build_exe"] = build_exe_options
+                  
+                  # Define launcher executalbe to create 
+                  exes = [Executable("Shvideo_qt/launch.py", 
+                                     base=base,
+                                     icon=os.path.join(PATH, "xdg", iconFile),
+                                     shortcutName= "%s" % info.PRODUCT_NAME,
+                                     shortcutDir= "ProgramMenuFolder",
+                                     targetName=exe_name)]
+                                     
+                  try: 
+                       # Include extra launcher configuration, if defined 
+                       exes.append(Executable("Shvideo_qt/launch.py",
+                                   base=extra_exe['base'],
+                                   icon=os.path.join(PATH, "xdg", iconFile),
+                                   targetName=extra_exe['name']))
+                  except NameError:
+                        pass 
+                        
+                  # Create distutils setup object 
+                  setup(name=info.PRODUCT_NAME, 
+                       version=info.VERSION,
+                       description=info.DESCRIPTION,
+                       author=info.COMPANY_NAME,
+                       options=build_options,
+                       executables=exes)
+                       
+                  
+                  # Remove temporary folder (if SRC folder present) 
+                  if os.path.exists(os.path.join(PATH, "src")):
+                      rmtree(os.path.join(PATH, "Shvideo_qt"), True)
