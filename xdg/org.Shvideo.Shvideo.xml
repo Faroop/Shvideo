@@ -1,1 +1,8 @@
-
+<?xml version="1.0"?>
+<mime-info xmlns='http://www.freedesktop.org/standards/shared-mime-info'>
+  <mime-type type="application/vnd.Shvideo-qt-project">
+    <comment>Shvideo 2.0 project</comment>
+    <glob pattern= "*.osp"/>
+    <generic-icon name="Shvideo-qt-doc"/>
+    </mime-type>
+  </mime-info> 
